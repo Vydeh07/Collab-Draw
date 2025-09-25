@@ -16,8 +16,25 @@ const roomRoutes = require('./routes/room.routes');
 const app = express();
 const server = http.createServer(app);
 
-// --- Middleware ---
-app.use(cors());
+// --- Middleware: CORS ---
+const allowedOrigins = [
+  'https://collab-draw-1-63dl.onrender.com',  // Your deployed frontend
+  'http://localhost:5173'            // Local Vite dev server
+];
+
+app.use(cors({
+  origin: function(origin, callback){
+    // Allow requests with no origin (like Postman or WebSocket)
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
 // --- Database Connection ---
@@ -31,8 +48,7 @@ app.use('/api/rooms', roomRoutes);
 
 // --- WebSocket Server Setup ---
 const wss = new WebSocketServer({ server });
-
-const clients = new Map(); // More efficient way to store clients
+const clients = new Map();
 
 function verifyUser(token) {
     if (!token) return null;
@@ -70,21 +86,16 @@ wss.on('connection', (ws, req) => {
         if (data.type === 'draw') {
             const { roomId, shape } = data;
 
-            // Save shape to DB
             try {
                 const room = await Room.findOne({ slug: roomId });
                 if (room) {
-                    await Chat.create({
-                        room: room._id,
-                        user: userId,
-                        shape: shape,
-                    });
+                    await Chat.create({ room: room._id, user: userId, shape });
                 }
             } catch (error) {
                 console.error("Error saving chat:", error);
             }
 
-            // Broadcast the drawing data to all clients in the same room
+            // Broadcast to all clients in the same room
             clients.forEach((client, webSocket) => {
                 if (client.rooms.has(roomId) && webSocket !== ws) {
                     webSocket.send(JSON.stringify({ type: 'draw', shape }));
@@ -98,7 +109,6 @@ wss.on('connection', (ws, req) => {
         clients.delete(ws);
     });
 });
-
 
 // --- Start Server ---
 const PORT = process.env.PORT || 5000;
