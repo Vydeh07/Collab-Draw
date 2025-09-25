@@ -18,7 +18,7 @@ const server = http.createServer(app);
 
 // --- Middleware: CORS ---
 const allowedOrigins = [
-  'https://collab-draw-1-63dl.onrender.com',  // Your deployed frontend
+  'https://collab-draw-eosin.vercel.app',  // Your deployed frontend
   'http://localhost:5173'            // Local Vite dev server
 ];
 
